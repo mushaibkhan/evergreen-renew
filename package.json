@@ -1,0 +1,14 @@
+{
+  "name": "evergreen-renew",
+  "version": "1.0.0",
+  "description": "Evergreen Renew Fullstack Monorepo Workspace",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:web\" \"npm run dev:mobile\" \"npm run dev:backend\"",
+    "dev:web": "cd web && npm run dev",
+    "dev:mobile": "cd mobile && npx expo start",
+    "dev:backend": "cd backend && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

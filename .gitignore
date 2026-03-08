@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.next
+.expo
+dev.db
+dev.sqlite
+dev.sqlite-journal
+*.log
