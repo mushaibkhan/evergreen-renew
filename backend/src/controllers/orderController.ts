@@ -67,3 +67,40 @@ export const getUserOrders = async (req: any, res: Response): Promise<void> => {
         res.status(500).json({ error: err.message });
     }
 };
+
+export const getAllOrders = async (req: any, res: Response): Promise<void> => {
+    try {
+        const orders = await prisma.order.findMany({
+            include: {
+                user: { select: { fullName: true, email: true, phoneNumber: true } },
+                quote: {
+                    include: { device: { include: { brand: true, category: true } } },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        res.json(orders);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const updateOrderStatus = async (req: any, res: Response): Promise<void> => {
+    try {
+        const { orderId } = req.params;
+        const { status, paymentStatus } = req.body;
+
+        const order = await prisma.order.update({
+            where: { id: orderId },
+            data: {
+                status: status || undefined,
+                paymentStatus: paymentStatus || undefined
+            },
+        });
+
+        res.json({ message: 'Order updated successfully', order });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};

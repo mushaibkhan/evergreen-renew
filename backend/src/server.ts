@@ -16,11 +16,13 @@ import categoryRoutes from './routes/categoryRoutes';
 import appraisalRoutes from './routes/appraisalRoutes';
 import authRoutes from './routes/authRoutes';
 import orderRoutes from './routes/orderRoutes';
+import adminRoutes from './routes/adminRoutes';
 
 app.use('/api/categories', categoryRoutes);
 app.use('/api/quotes', appraisalRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'OK', message: 'Evergreen Renew API is running' });

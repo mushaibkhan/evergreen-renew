@@ -25,3 +25,11 @@ export const authenticateJWT = (req: AuthRequest, res: Response, next: NextFunct
         res.status(401).json({ error: 'Unauthorized, token missing' });
     }
 };
+
+export const isAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (req.user && req.user.role === 'ADMIN') {
+        next();
+    } else {
+        res.status(403).json({ error: 'Access denied. Admin only.' });
+    }
+};

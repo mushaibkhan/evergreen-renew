@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { createOrder, getUserOrders } from '../controllers/orderController';
-import { authenticateJWT } from '../middlewares/authMiddleware';
+import { createOrder, getUserOrders, getAllOrders, updateOrderStatus } from '../controllers/orderController';
+import { authenticateJWT, isAdmin } from '../middlewares/authMiddleware';
 
 const router = Router();
 
@@ -9,5 +9,9 @@ router.use(authenticateJWT);
 
 router.post('/', createOrder);
 router.get('/my-orders', getUserOrders);
+
+// Admin-only routes
+router.get('/admin/all', isAdmin, getAllOrders);
+router.patch('/admin/:orderId', isAdmin, updateOrderStatus);
 
 export default router;
