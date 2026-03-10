@@ -1,44 +1,58 @@
 import { Request, Response } from 'express';
-import db from '../utils/db';
+import prisma from '../utils/db';
 
-export const getCategories = (req: Request, res: Response) => {
-    db.all('SELECT * FROM Categories', [], (err, rows) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        res.json(rows);
-    });
+export const getCategories = async (_req: Request, res: Response): Promise<void> => {
+    try {
+        const categories = await prisma.category.findMany({
+            where: { isActive: true },
+            orderBy: { name: 'asc' },
+        });
+        res.json(categories);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 };
 
-export const getBrandsByCategory = (req: Request, res: Response) => {
-    const { categoryId } = req.params;
-    db.all('SELECT * FROM Brands WHERE categoryId = ?', [categoryId], (err, rows) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        res.json(rows);
-    });
+export const getBrandsByCategory = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { categoryId } = req.params;
+        const brands = await prisma.brand.findMany({
+            where: { categoryId },
+            orderBy: { name: 'asc' },
+        });
+        res.json(brands);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 };
 
-export const getDevicesByBrand = (req: Request, res: Response) => {
-    const { brandId } = req.params;
-    db.all('SELECT * FROM Devices WHERE brandId = ?', [brandId], (err, rows) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        res.json(rows);
-    });
+export const getDevicesByBrand = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { brandId } = req.params;
+        const devices = await prisma.device.findMany({
+            where: { brandId },
+            include: { brand: true, category: true },
+            orderBy: { name: 'asc' },
+        });
+        res.json(devices);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 };
 
-export const getDeviceDetails = (req: Request, res: Response) => {
-    const { slug } = req.params;
-    db.get('SELECT * FROM Devices WHERE slug = ?', [slug], (err, row) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
+export const getDeviceDetails = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { slug } = req.params;
+        const device = await prisma.device.findUnique({
+            where: { slug },
+            include: { brand: true, category: true },
+        });
+        if (!device) {
+            res.status(404).json({ error: 'Device not found' });
+            return;
         }
-        if (!row) {
-            return res.status(404).json({ error: 'Device not found' });
-        }
-        res.json(row);
-    });
+        res.json(device);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 };

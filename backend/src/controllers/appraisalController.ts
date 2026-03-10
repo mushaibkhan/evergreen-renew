@@ -1,73 +1,93 @@
 import { Request, Response } from 'express';
-import db from '../utils/db';
+import prisma from '../utils/db';
 
-export const getDeviceQuestions = (req: Request, res: Response) => {
-    const { deviceId } = req.params;
+export const getDeviceQuestions = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { deviceId } = req.params;
 
-    // Selsmart Mock Evaluation Questions Flow
-    const questions = [
-        {
-            id: 'q1',
-            text: 'Does your device switch on?',
-            type: 'YES_NO',
-            options: [
-                { id: 'opt1_y', label: 'Yes', priceDeduction: 0 },
-                { id: 'opt1_n', label: 'No', priceDeduction: 10000 }
-            ]
-        },
-        {
-            id: 'q2',
-            text: 'Are there any scratches on the screen?',
-            type: 'MULTIPLE_CHOICE',
-            options: [
-                { id: 'opt2_none', label: 'Flawless', priceDeduction: 0 },
-                { id: 'opt2_minor', label: 'Minor Scratches', priceDeduction: 1500 },
-                { id: 'opt2_heavy', label: 'Heavy Scratches / Cracked', priceDeduction: 4500 }
-            ]
+        const device = await prisma.device.findUnique({
+            where: { id: deviceId },
+            select: {
+                id: true,
+                name: true,
+                basePrice: true,
+                categoryId: true,
+            },
+        });
+
+        if (!device) {
+            res.status(404).json({ error: 'Device not found' });
+            return;
         }
-    ];
 
-    // In a real DB scenario, we would map `deviceId` -> `categoryId` 
-    // -> `Questionnaire` -> `Questions`. Returning mock here for scoping speed.
-    res.json({ deviceId, questions });
+        const questionnaires = await prisma.questionnaire.findMany({
+            where: { categoryId: device.categoryId },
+            include: {
+                questions: {
+                    include: { options: true },
+                },
+            },
+        });
+
+        const questions = questionnaires.length > 0 ? questionnaires[0].questions : [];
+
+        res.json({ deviceId: device.id, deviceName: device.name, basePrice: device.basePrice, questions });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 };
 
-export const evaluateQuote = (req: Request, res: Response) => {
-    const { deviceId, selectedOptions } = req.body;
-    // selectedOptions = [{ questionId: 'q1', optionId: 'opt1_y' }, ...]
+export const evaluateQuote = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { deviceId, selectedOptionIds } = req.body;
 
-    db.get('SELECT basePrice FROM Devices WHERE id = ?', [deviceId], (err, row: any) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (!row) return res.status(404).json({ error: 'Device not found' });
-
-        let finalPrice = row.basePrice;
-
-        // A simplified mock deduction logic matching Selsmart flow
-        // A fully scaled system would query QuestionOption table via IDs to map `priceDeduction`.
-
-        // Hardcoded deduction map for simulation:
-        const mockDeductions: Record<string, number> = {
-            'opt1_n': 10000,
-            'opt2_minor': 1500,
-            'opt2_heavy': 4500
-        };
-
-        if (Array.isArray(selectedOptions)) {
-            selectedOptions.forEach((opt: any) => {
-                if (mockDeductions[opt.optionId]) {
-                    finalPrice -= mockDeductions[opt.optionId];
-                }
-            });
+        const device = await prisma.device.findUnique({ where: { id: deviceId } });
+        if (!device) {
+            res.status(404).json({ error: 'Device not found' });
+            return;
         }
 
-        // Ensure price doesn't drop below 0
-        finalPrice = Math.max(0, finalPrice);
+        let totalDeduction = 0;
+
+        if (Array.isArray(selectedOptionIds) && selectedOptionIds.length > 0) {
+            const optionIds: string[] = selectedOptionIds;
+            const options = await prisma.questionOption.findMany({
+                where: { id: { in: optionIds } },
+            });
+
+            for (const opt of options) {
+                if (opt.percentageDeduction) {
+                    totalDeduction += (device.basePrice * opt.percentageDeduction) / 100;
+                } else {
+                    totalDeduction += opt.priceDeduction;
+                }
+            }
+        }
+
+        const offeredPrice = Math.max(0, device.basePrice - totalDeduction);
+
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+
+        const quote = await prisma.quote.create({
+            data: {
+                deviceId,
+                offeredPrice,
+                conditionAnswers: selectedOptionIds ?? [],
+                status: 'PENDING_CHECKOUT',
+                expiresAt,
+            },
+        });
 
         res.json({
+            quoteId: quote.id,
             deviceId,
-            basePrice: row.basePrice,
-            offeredPrice: finalPrice,
-            quoteId: `quote_${Date.now()}` // Mock quote generation
+            basePrice: device.basePrice,
+            totalDeduction,
+            offeredPrice,
+            expiresAt: quote.expiresAt,
         });
-    });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 };

@@ -1,41 +1,69 @@
-import { Request, Response } from 'express';
-import db from '../utils/db';
-import { v4 as uuidv4 } from 'uuid';
+import { Response } from 'express';
+import prisma from '../utils/db';
 
-// In a real scenario, `req` would be extended via `AuthRequest` interface
-export const createOrder = (req: any, res: Response) => {
-    const { quoteId, pickupDate, timeSlot, pickupAddressId, paymentMethod } = req.body;
-    const userId = req.user.id;
+export const createOrder = async (req: any, res: Response): Promise<void> => {
+    try {
+        const { quoteId, pickupDate, timeSlot, pickupAddressId, paymentMethod } = req.body;
+        const userId = req.user.id;
 
-    if (!quoteId || !pickupDate || !timeSlot) {
-        return res.status(400).json({ error: 'Missing required order fields' });
-    }
-
-    const orderId = uuidv4();
-
-    // Create order via SQLite
-    db.run(
-        `INSERT INTO Orders (id, userId, quoteId, pickupAddressId, pickupDate, timeSlot, paymentMethod)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [orderId, userId, quoteId, pickupAddressId || null, pickupDate, timeSlot, paymentMethod || 'Cash'],
-        function (err) {
-            if (err) {
-                return res.status(500).json({ error: err.message });
-            }
-
-            res.status(201).json({
-                message: 'Order created successfully. Pickup scheduled.',
-                orderId
-            });
+        if (!quoteId || !pickupDate || !timeSlot) {
+            res.status(400).json({ error: 'Missing required order fields' });
+            return;
         }
-    );
+
+        const quote = await prisma.quote.findUnique({ where: { id: quoteId } });
+        if (!quote) {
+            res.status(404).json({ error: 'Quote not found' });
+            return;
+        }
+        if (quote.status !== 'PENDING_CHECKOUT') {
+            res.status(400).json({ error: 'Quote is no longer valid' });
+            return;
+        }
+
+        const order = await prisma.order.create({
+            data: {
+                userId,
+                quoteId,
+                pickupAddressId,
+                pickupDate: new Date(pickupDate),
+                timeSlot,
+                paymentMethod: paymentMethod || 'Cash',
+                status: 'SCHEDULED',
+                paymentStatus: 'PENDING',
+            },
+        });
+
+        await prisma.quote.update({
+            where: { id: quoteId },
+            data: { status: 'ACCEPTED' },
+        });
+
+        res.status(201).json({
+            message: 'Order created successfully. Pickup scheduled.',
+            orderId: order.id,
+        });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 };
 
-export const getUserOrders = (req: any, res: Response) => {
-    const userId = req.user.id;
+export const getUserOrders = async (req: any, res: Response): Promise<void> => {
+    try {
+        const userId = req.user.id;
 
-    db.all('SELECT * FROM Orders WHERE userId = ? ORDER BY createdAt DESC', [userId], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
+        const orders = await prisma.order.findMany({
+            where: { userId },
+            include: {
+                quote: {
+                    include: { device: { include: { brand: true, category: true } } },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        res.json(orders);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 };

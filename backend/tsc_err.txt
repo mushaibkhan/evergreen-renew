@@ -1,0 +1,8 @@
+﻿src/controllers/appraisalController.ts(9,22): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/controllers/categoryController.ts(20,22): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"Brand"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"Brand"> | undefined'.
+src/controllers/categoryController.ts(33,22): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"Device"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"Device"> | undefined'.
+src/controllers/categoryController.ts(47,22): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.

@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  AGENT
+}
+
+enum QuestionType {
+  YES_NO
+  MULTIPLE_CHOICE
+}
+
+enum QuoteStatus {
+  PENDING_CHECKOUT
+  EXPIRED
+  ACCEPTED
+}
+
+enum OrderStatus {
+  SCHEDULED
+  AGENT_ASSIGNED
+  EVALUATION_IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  phoneNumber   String?   @unique
+  passwordHash  String
+  fullName      String?
+  role          Role      @default(CUSTOMER)
+
+  addresses     Address[]
+  orders        Order[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Address {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  street      String
+  city        String
+  state       String
+  postalCode  String
+  country     String   @default("India")
+
+  isDefault   Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  imageUrl    String?
+  description String?
+  isActive    Boolean  @default(true)
+
+  brands      Brand[]
+  devices     Device[]
+  questionnaires Questionnaire[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Brand {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  imageUrl    String?
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  devices     Device[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Device {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  imageUrl    String?
+  basePrice   Float
+
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  brandId     String
+  brand       Brand    @relation(fields: [brandId], references: [id])
+
+  quotes      Quote[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Questionnaire {
+  id          String   @id @default(uuid())
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  questions   Question[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Question {
+  id              String         @id @default(uuid())
+  questionnaireId String
+  questionnaire   Questionnaire  @relation(fields: [questionnaireId], references: [id])
+
+  text            String
+  type            QuestionType   @default(YES_NO)
+
+  options         QuestionOption[]
+}
+
+model QuestionOption {
+  id                  String   @id @default(uuid())
+  questionId          String
+  question            Question @relation(fields: [questionId], references: [id])
+
+  label               String
+  priceDeduction      Float
+  percentageDeduction Float?
+}
+
+model Quote {
+  id               String      @id @default(uuid())
+  deviceId         String
+  device           Device      @relation(fields: [deviceId], references: [id])
+
+  offeredPrice     Float
+  conditionAnswers Json?
+
+  status           QuoteStatus @default(PENDING_CHECKOUT)
+
+  order            Order?
+
+  createdAt        DateTime    @default(now())
+  expiresAt        DateTime
+}
+
+model Order {
+  id              String        @id @default(uuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+
+  quoteId         String        @unique
+  quote           Quote         @relation(fields: [quoteId], references: [id])
+
+  pickupAddressId String?
+
+  pickupDate      DateTime
+  timeSlot        String
+
+  status          OrderStatus   @default(SCHEDULED)
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentMethod   String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
