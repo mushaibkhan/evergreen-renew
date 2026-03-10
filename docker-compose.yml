@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: evergreen_renew
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - evergreen-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://postgres:password123@db:5432/evergreen_renew?schema=public
+      JWT_SECRET: evergreen_super_secret_key_123!
+      PORT: 5000
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+    networks:
+      - evergreen-network
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:5000/api
+    restart: always
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - evergreen-network
+
+networks:
+  evergreen-network:
+    driver: bridge
+
+volumes:
+  pgdata:
